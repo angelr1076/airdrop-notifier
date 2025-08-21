@@ -24,7 +24,8 @@ async function discordNotifier(item, feedTitle) {
     avatar_url:
       process.env.DISCORD_AVATAR_URL || 'https://i.imgur.com/fSdQHd8.png',
     content: `🪂 Possible airdrop-related post from ${feedTitle}`,
-    allowed_mentions: { parse: [] }, [
+    allowed_mentions: { parse: [] },
+    embeds: [
       {
         title: item.title ?? '(no title)',
         url: item.link || undefined,
