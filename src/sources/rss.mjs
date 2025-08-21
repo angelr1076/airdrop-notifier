@@ -16,6 +16,14 @@ const REQ_HEADERS = {
     'application/rss+xml, application/atom+xml, application/xml;q=0.9, */*;q=0.8',
 };
 
+function sanitizeXml(xml = '') {
+  return xml.replace(/&(?!amp;|lt;|gt;|quot;|apos;)/g, '&amp;');
+}
+
+function stripHtml(s = '') {
+  return s.replace(/<[^>]*>/g, ' ');
+}
+
 function matches(text) {
   const t = (text ?? '').toLowerCase();
   return KEYWORDS.length === 0 || KEYWORDS.some(k => t.includes(k));
@@ -31,15 +39,22 @@ export async function pollRSS() {
 
   for (const url of feeds) {
     try {
-      // Log HTTP errors explicitly
       const res = await fetch(url, { headers: REQ_HEADERS });
       if (!res.ok) {
         console.error(`RSS preflight failed: ${url} → HTTP ${res.status}`);
         continue;
       }
+
       const xml = await res.text();
 
-      const feed = await parser.parseString(xml);
+      let feed;
+      try {
+        feed = await parser.parseString(sanitizeXml(xml));
+      } catch (err) {
+        console.error(`Error parsing feed ${url}:`, err.message);
+        continue;
+      }
+
       const feedTitle = feed.title ?? url;
 
       for (const item of feed.items ?? []) {
@@ -47,12 +62,11 @@ export async function pollRSS() {
           item.guid || item.link || item.title || String(item.pubDate || '');
         if (await hasSeen(url, id)) continue;
 
-        const hay = [
-          item.title,
-          item.contentSnippet,
-          item.content,
-          item.summary,
-        ].join('\n');
+        const hay = stripHtml(
+          [item.title, item.contentSnippet, item.content, item.summary].join(
+            '\n'
+          )
+        );
         if (!matches(hay)) continue;
 
         const ts = Date.parse(item.isoDate || item.pubDate || '') || Date.now();
